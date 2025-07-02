@@ -20,15 +20,19 @@ class ValidationError extends HttpError {
 	}
 }
 
+// Configure logger based on environment
 const logger = pino({
-	transport: {
-		target: 'pino-pretty',
-		options: {
-			colorize: true,
-			ignoreKeys: ['hostname', 'pid'],
-			translateTime: 'SYS:standard',
+	level: process.env.NODE_ENV === 'production' ? 'info' : 'debug',
+	...(process.env.NODE_ENV !== 'production' && {
+		transport: {
+			target: 'pino-pretty',
+			options: {
+				colorize: true,
+				ignoreKeys: ['hostname', 'pid'],
+				translateTime: 'SYS:standard',
+			},
 		},
-	},
+	}),
 });
 
 const app = express();
