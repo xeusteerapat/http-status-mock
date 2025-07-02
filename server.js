@@ -42,19 +42,44 @@ const port = 3001;
 app.use(
 	pinoHttp({
 		logger,
-		// Log the request body
-		redact: ['req.headers.cookie', 'req.headers.authorization'],
+		// Customize log serialization
+		serializers: {
+			req(req) {
+				return {
+					id: req.id,
+					method: req.method,
+					url: req.url,
+					remoteAddress: req.remoteAddress,
+				};
+			},
+			res(res) {
+				return {
+					statusCode: res.statusCode,
+				};
+			},
+		},
 		customLogLevel: function (res, err) {
 			if (res.statusCode >= 400 && res.statusCode < 500) return 'warn';
 			if (res.statusCode >= 500 || err) return 'error';
 			return 'info';
 		},
 		customSuccessMessage: function (res) {
-			if (res.statusCode === 404) return 'Resource not found';
-			return `Request completed with status ${res.statusCode}`;
+			let message = `${res.statusCode}`;
+			try {
+				if (res.statusCode >= 100 && res.statusCode < 600) {
+					message += ` ${getReasonPhrase(res.statusCode)}`;
+				}
+			} catch (err) {}
+			return message;
 		},
 		customErrorMessage: function (error, res) {
-			return 'Request errored with status code: ' + res.statusCode;
+			let message = `Error: ${res.statusCode}`;
+			try {
+				if (res.statusCode >= 100 && res.statusCode < 600) {
+					message += ` ${getReasonPhrase(res.statusCode)}`;
+				}
+			} catch (err) {}
+			return message;
 		},
 	})
 );
@@ -239,10 +264,21 @@ app.use((err, req, res, next) => {
 	const statusCode = err.statusCode || 500;
 	const errorMessage = err.message || 'Internal Server Error';
 
+	// Create a minimal log object with essential information
+	const logInfo = {
+		statusCode,
+		path: req.path,
+		error: {
+			name: err.name,
+			message: err.message,
+			...(err.stack && { stack: err.stack }),
+		},
+	};
+
 	if (statusCode >= 500) {
-		logger.error({ err, req, res }, errorMessage);
+		logger.error(logInfo, `Server Error: ${errorMessage}`);
 	} else {
-		logger.warn({ err, req, res }, errorMessage);
+		logger.warn(logInfo, `Client Error: ${errorMessage}`);
 	}
 
 	res.status(statusCode).send(`
