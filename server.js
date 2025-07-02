@@ -3,6 +3,7 @@ const { getReasonPhrase } = require('http-status-codes');
 const rateLimit = require('express-rate-limit');
 const pino = require('pino');
 const pinoHttp = require('pino-http');
+const statusDescriptions = require('./status-descriptions');
 
 // Custom error classes
 class HttpError extends Error {
@@ -115,13 +116,13 @@ app.get('/:statusCode', (req, res, next) => {
             <style>
                 body {
                     font-family: Arial, sans-serif;
+                    margin: 0;
+                    background-color: #f5f5f5;
+                    min-height: 100vh;
                     display: flex;
                     flex-direction: column;
                     align-items: center;
-                    justify-content: center;
-                    height: 100vh;
-                    margin: 0;
-                    background-color: #f5f5f5;
+                    padding: 2rem;
                 }
                 .status-container {
                     text-align: center;
@@ -129,6 +130,8 @@ app.get('/:statusCode', (req, res, next) => {
                     background-color: white;
                     border-radius: 8px;
                     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+                    max-width: 800px;
+                    width: 100%;
                 }
                 .status-code {
                     font-size: 4rem;
@@ -140,12 +143,34 @@ app.get('/:statusCode', (req, res, next) => {
                     color: #666;
                     margin-top: 1rem;
                 }
+                .status-description {
+                    margin-top: 2rem;
+                    color: #444;
+                    line-height: 1.6;
+                    text-align: left;
+                    padding: 1rem;
+                    background-color: #f8f9fa;
+                    border-radius: 4px;
+                }
+                .home-link {
+                    display: inline-block;
+                    margin-top: 1.5rem;
+                    color: #0066cc;
+                    text-decoration: none;
+                }
+                .home-link:hover {
+                    text-decoration: underline;
+                }
             </style>
         </head>
         <body>
             <div class="status-container">
                 <h1 class="status-code">${statusCode}</h1>
                 <p class="status-text">${reasonPhrase}</p>
+                <div class="status-description">
+                    <p>${statusDescriptions[statusCode] || 'No additional description available.'}</p>
+                </div>
+                <a href="/" class="home-link">Back to Home</a>
             </div>
         </body>
         </html>
@@ -153,6 +178,15 @@ app.get('/:statusCode', (req, res, next) => {
 });
 
 app.get('/', (req, res) => {
+	// Group status codes by their classes
+	const statusGroups = {
+		'1xx Informational': Object.keys(statusDescriptions).filter(code => code >= 100 && code < 200),
+		'2xx Success': Object.keys(statusDescriptions).filter(code => code >= 200 && code < 300),
+		'3xx Redirection': Object.keys(statusDescriptions).filter(code => code >= 300 && code < 400),
+		'4xx Client Error': Object.keys(statusDescriptions).filter(code => code >= 400 && code < 500),
+		'5xx Server Error': Object.keys(statusDescriptions).filter(code => code >= 500 && code < 600)
+	};
+
 	res.send(`
         <!DOCTYPE html>
         <html>
@@ -161,7 +195,7 @@ app.get('/', (req, res) => {
             <style>
                 body {
                     font-family: Arial, sans-serif;
-                    max-width: 800px;
+                    max-width: 1200px;
                     margin: 2rem auto;
                     padding: 0 1rem;
                 }
@@ -176,80 +210,69 @@ app.get('/', (req, res) => {
                 }
                 .status-groups {
                     display: grid;
-                    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-                    gap: 1rem;
+                    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+                    gap: 1.5rem;
                 }
                 .status-group {
                     background-color: white;
-                    padding: 1rem;
-                    border-radius: 4px;
+                    padding: 1.5rem;
+                    border-radius: 8px;
                     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
                 }
                 .status-group h2 {
                     margin-top: 0;
+                    color: #333;
+                    border-bottom: 2px solid #eee;
+                    padding-bottom: 0.5rem;
                 }
                 .status-list {
                     list-style: none;
                     padding: 0;
+                    margin: 0;
                 }
                 .status-list li {
-                    margin-bottom: 0.5rem;
+                    margin: 0.5rem 0;
+                    padding: 0.5rem;
+                    border-radius: 4px;
+                    transition: background-color 0.2s;
+                }
+                .status-list li:hover {
+                    background-color: #f5f5f5;
                 }
                 a {
                     color: #0066cc;
                     text-decoration: none;
+                    display: block;
                 }
                 a:hover {
                     text-decoration: underline;
                 }
+
             </style>
         </head>
         <body>
             <h1>HTTP Status Code Tester</h1>
             <div class="instructions">
-                <p>Enter any status code from 100-599 in the URL path (e.g., /404) to see the corresponding status page.</p>
+                <p>Click on any status code below to see its details, or enter a status code (100-599) in the URL path (e.g., /404).</p>
             </div>
             <div class="status-groups">
-                <div class="status-group">
-                    <h2>1xx Informational</h2>
-                    <ul class="status-list">
-                        <li><a href="/100">100 Continue</a></li>
-                        <li><a href="/101">101 Switching Protocols</a></li>
-                    </ul>
-                </div>
-                <div class="status-group">
-                    <h2>2xx Success</h2>
-                    <ul class="status-list">
-                        <li><a href="/200">200 OK</a></li>
-                        <li><a href="/201">201 Created</a></li>
-                        <li><a href="/204">204 No Content</a></li>
-                    </ul>
-                </div>
-                <div class="status-group">
-                    <h2>3xx Redirection</h2>
-                    <ul class="status-list">
-                        <li><a href="/301">301 Moved Permanently</a></li>
-                        <li><a href="/302">302 Found</a></li>
-                        <li><a href="/304">304 Not Modified</a></li>
-                    </ul>
-                </div>
-                <div class="status-group">
-                    <h2>4xx Client Error</h2>
-                    <ul class="status-list">
-                        <li><a href="/400">400 Bad Request</a></li>
-                        <li><a href="/401">401 Unauthorized</a></li>
-                        <li><a href="/403">403 Forbidden</a></li>
-                        <li><a href="/404">404 Not Found</a></li>
-                    </ul>
-                </div>
-                <div class="status-group">
-                    <h2>5xx Server Error</h2>
-                    <ul class="status-list">
-                        <li><a href="/500">500 Internal Server Error</a></li>
-                        <li><a href="/502">502 Bad Gateway</a></li>
-                        <li><a href="/503">503 Service Unavailable</a></li>
-                    </ul>
-                </div>
+                ${Object.entries(statusGroups).map(([groupName, codes]) => `
+                    <div class="status-group">
+                        <h2>${groupName}</h2>
+                        <ul class="status-list">
+                            ${codes.map(code => {
+                                let reasonPhrase = '';
+                                try {
+                                    reasonPhrase = getReasonPhrase(parseInt(code));
+                                } catch (err) {}
+                                return `
+                                <li>
+                                    <a href="/${code}">${code} ${reasonPhrase}</a>
+                                </li>
+                            `}).join('')}
+                        </ul>
+                    </div>
+                `).join('')}
             </div>
         </body>
         </html>
