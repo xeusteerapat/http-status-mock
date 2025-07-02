@@ -26,32 +26,34 @@ const logger = pino({
 		options: {
 			colorize: true,
 			ignoreKeys: ['hostname', 'pid'],
-			translateTime: 'SYS:standard'
-		}
-	}
+			translateTime: 'SYS:standard',
+		},
+	},
 });
 
 const app = express();
 const port = 3001;
 
 // Add request logging middleware
-app.use(pinoHttp({
-	logger,
-	// Log the request body
-	redact: ['req.headers.cookie', 'req.headers.authorization'],
-	customLogLevel: function (res, err) {
-		if (res.statusCode >= 400 && res.statusCode < 500) return 'warn';
-		if (res.statusCode >= 500 || err) return 'error';
-		return 'info';
-	},
-	customSuccessMessage: function (res) {
-		if (res.statusCode === 404) return 'Resource not found';
-		return `Request completed with status ${res.statusCode}`;
-	},
-	customErrorMessage: function (error, res) {
-		return 'Request errored with status code: ' + res.statusCode;
-	}
-}));
+app.use(
+	pinoHttp({
+		logger,
+		// Log the request body
+		redact: ['req.headers.cookie', 'req.headers.authorization'],
+		customLogLevel: function (res, err) {
+			if (res.statusCode >= 400 && res.statusCode < 500) return 'warn';
+			if (res.statusCode >= 500 || err) return 'error';
+			return 'info';
+		},
+		customSuccessMessage: function (res) {
+			if (res.statusCode === 404) return 'Resource not found';
+			return `Request completed with status ${res.statusCode}`;
+		},
+		customErrorMessage: function (error, res) {
+			return 'Request errored with status code: ' + res.statusCode;
+		},
+	})
+);
 
 // Max 100 requests per minute per IP
 const limiter = rateLimit({
@@ -225,24 +227,20 @@ app.get('/', (req, res) => {
     `);
 });
 
-// 404 handler
 app.use((req, res, next) => {
 	next(new HttpError(404, 'Resource not found'));
 });
 
-// Error handling middleware
 app.use((err, req, res, next) => {
 	const statusCode = err.statusCode || 500;
 	const errorMessage = err.message || 'Internal Server Error';
 
-	// Log the error
 	if (statusCode >= 500) {
 		logger.error({ err, req, res }, errorMessage);
 	} else {
 		logger.warn({ err, req, res }, errorMessage);
 	}
 
-	// Send error response
 	res.status(statusCode).send(`
 		<!DOCTYPE html>
 		<html>
