@@ -1,38 +1,65 @@
 const express = require('express');
 const { getReasonPhrase } = require('http-status-codes');
 const rateLimit = require('express-rate-limit');
+const pino = require('pino');
+const pinoHttp = require('pino-http');
+
+const logger = pino({
+	transport: {
+		target: 'pino-pretty',
+		options: {
+			colorize: true,
+			ignoreKeys: ['hostname', 'pid'],
+			translateTime: 'SYS:standard'
+		}
+	}
+});
 
 const app = express();
 const port = 3001;
 
-// Create a limiter: max 100 requests per minute per IP
+// Add request logging middleware
+app.use(pinoHttp({
+	logger,
+	// Log the request body
+	redact: ['req.headers.cookie', 'req.headers.authorization'],
+	customLogLevel: function (res, err) {
+		if (res.statusCode >= 400 && res.statusCode < 500) return 'warn';
+		if (res.statusCode >= 500 || err) return 'error';
+		return 'info';
+	},
+	customSuccessMessage: function (res) {
+		if (res.statusCode === 404) return 'Resource not found';
+		return `Request completed with status ${res.statusCode}`;
+	},
+	customErrorMessage: function (error, res) {
+		return 'Request errored with status code: ' + res.statusCode;
+	}
+}));
+
+// Max 100 requests per minute per IP
 const limiter = rateLimit({
 	windowMs: 1 * 60 * 1000, // 1 minute
 	max: 100, // limit each IP to 100 requests per windowMs
 	message: {
 		status: 429,
-		message: 'Too many requests from this IP, please try again after a minute'
-	}
+		message: 'Too many requests from this IP, please try again after a minute',
+	},
 });
 
-// Apply rate limiting to all routes
 app.use(limiter);
 
-// Serve static files
 app.use(express.static('public'));
 
-// Handle status code requests
 app.get('/:statusCode', (req, res) => {
 	const statusCode = parseInt(req.params.statusCode);
 
-	// Check if status code is valid
 	if (isNaN(statusCode) || statusCode < 100 || statusCode > 599) {
 		return res.status(400).send('Invalid status code');
 	}
 
 	const reasonPhrase = getReasonPhrase(statusCode);
 
-	// Send response with requested status code
 	res.status(statusCode).send(`
         <!DOCTYPE html>
         <html>
@@ -78,7 +105,6 @@ app.get('/:statusCode', (req, res) => {
     `);
 });
 
-// Default route
 app.get('/', (req, res) => {
 	res.send(`
         <!DOCTYPE html>
@@ -184,5 +210,5 @@ app.get('/', (req, res) => {
 });
 
 app.listen(port, () => {
-	console.log(`Server running at http://localhost:${port}`);
+	logger.info(`Server running at http://localhost:${port}`);
 });
