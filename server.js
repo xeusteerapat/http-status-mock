@@ -4,6 +4,22 @@ const rateLimit = require('express-rate-limit');
 const pino = require('pino');
 const pinoHttp = require('pino-http');
 
+// Custom error classes
+class HttpError extends Error {
+	constructor(statusCode, message) {
+		super(message);
+		this.statusCode = statusCode;
+		this.name = 'HttpError';
+	}
+}
+
+class ValidationError extends HttpError {
+	constructor(message) {
+		super(400, message);
+		this.name = 'ValidationError';
+	}
+}
+
 const logger = pino({
 	transport: {
 		target: 'pino-pretty',
@@ -51,11 +67,11 @@ app.use(limiter);
 
 app.use(express.static('public'));
 
-app.get('/:statusCode', (req, res) => {
+app.get('/:statusCode', (req, res, next) => {
 	const statusCode = parseInt(req.params.statusCode);
 
 	if (isNaN(statusCode) || statusCode < 100 || statusCode > 599) {
-		return res.status(400).send('Invalid status code');
+		return next(new ValidationError('Invalid status code'));
 	}
 
 	const reasonPhrase = getReasonPhrase(statusCode);
@@ -207,6 +223,79 @@ app.get('/', (req, res) => {
         </body>
         </html>
     `);
+});
+
+// 404 handler
+app.use((req, res, next) => {
+	next(new HttpError(404, 'Resource not found'));
+});
+
+// Error handling middleware
+app.use((err, req, res, next) => {
+	const statusCode = err.statusCode || 500;
+	const errorMessage = err.message || 'Internal Server Error';
+
+	// Log the error
+	if (statusCode >= 500) {
+		logger.error({ err, req, res }, errorMessage);
+	} else {
+		logger.warn({ err, req, res }, errorMessage);
+	}
+
+	// Send error response
+	res.status(statusCode).send(`
+		<!DOCTYPE html>
+		<html>
+		<head>
+			<title>Error ${statusCode}</title>
+			<style>
+				body {
+					font-family: Arial, sans-serif;
+					display: flex;
+					flex-direction: column;
+					align-items: center;
+					justify-content: center;
+					height: 100vh;
+					margin: 0;
+					background-color: #f5f5f5;
+				}
+				.error-container {
+					text-align: center;
+					padding: 2rem;
+					background-color: white;
+					border-radius: 8px;
+					box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+				}
+				.error-code {
+					font-size: 4rem;
+					margin: 0;
+					color: #dc3545;
+				}
+				.error-message {
+					font-size: 1.5rem;
+					color: #666;
+					margin-top: 1rem;
+				}
+				.home-link {
+					display: inline-block;
+					margin-top: 1.5rem;
+					color: #0066cc;
+					text-decoration: none;
+				}
+				.home-link:hover {
+					text-decoration: underline;
+				}
+			</style>
+		</head>
+		<body>
+			<div class="error-container">
+				<h1 class="error-code">${statusCode}</h1>
+				<p class="error-message">${errorMessage}</p>
+				<a href="/" class="home-link">Back to Home</a>
+			</div>
+		</body>
+		</html>
+	`);
 });
 
 app.listen(port, () => {
