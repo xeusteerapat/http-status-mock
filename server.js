@@ -1,8 +1,22 @@
 const express = require('express');
 const { getReasonPhrase } = require('http-status-codes');
+const rateLimit = require('express-rate-limit');
 
 const app = express();
 const port = 3001;
+
+// Create a limiter: max 100 requests per minute per IP
+const limiter = rateLimit({
+	windowMs: 1 * 60 * 1000, // 1 minute
+	max: 100, // limit each IP to 100 requests per windowMs
+	message: {
+		status: 429,
+		message: 'Too many requests from this IP, please try again after a minute'
+	}
+});
+
+// Apply rate limiting to all routes
+app.use(limiter);
 
 // Serve static files
 app.use(express.static('public'));
