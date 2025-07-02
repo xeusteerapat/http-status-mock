@@ -1,5 +1,5 @@
 const express = require('express');
-const { StatusCodes, getReasonPhrase } = require('http-status-codes');
+const { getReasonPhrase } = require('http-status-codes');
 
 const app = express();
 const port = 3001;
@@ -9,17 +9,17 @@ app.use(express.static('public'));
 
 // Handle status code requests
 app.get('/:statusCode', (req, res) => {
-    const statusCode = parseInt(req.params.statusCode);
-    
-    // Check if status code is valid
-    if (isNaN(statusCode) || statusCode < 100 || statusCode > 599) {
-        return res.status(400).send('Invalid status code');
-    }
+	const statusCode = parseInt(req.params.statusCode);
 
-    const reasonPhrase = getReasonPhrase(statusCode);
-    
-    // Send response with requested status code
-    res.status(statusCode).send(`
+	// Check if status code is valid
+	if (isNaN(statusCode) || statusCode < 100 || statusCode > 599) {
+		return res.status(400).send('Invalid status code');
+	}
+
+	const reasonPhrase = getReasonPhrase(statusCode);
+
+	// Send response with requested status code
+	res.status(statusCode).send(`
         <!DOCTYPE html>
         <html>
         <head>
@@ -66,7 +66,7 @@ app.get('/:statusCode', (req, res) => {
 
 // Default route
 app.get('/', (req, res) => {
-    res.send(`
+	res.send(`
         <!DOCTYPE html>
         <html>
         <head>
@@ -170,5 +170,5 @@ app.get('/', (req, res) => {
 });
 
 app.listen(port, () => {
-    console.log(`Server running at http://localhost:${port}`);
+	console.log(`Server running at http://localhost:${port}`);
 });
